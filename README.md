@@ -1,10 +1,6 @@
-# RAG-Chatbot
-RAG Chatbot is an end-to-end research assistant powered by FastAPI, LangChain, Groq, and ChromaDB. It parses complex academic PDFs, extracts structured sections, generates summaries, and enables grounded conversational Q&amp;A. It includes a benchmark suite evaluating semantic chunking and cross-encoder reranking across Hit Rate@3, MRR, and accuracy.
+# RAG Chatbot
 
-
-# Research Paper RAG Chatbot & Retrieval Benchmarking Suite
-
-A production-ready Retrieval-Augmented Generation (RAG) system built with **FastAPI**, **LangChain**, **Groq**, and **ChromaDB**. The project features an interactive web interface to parse, segment, summarize, and chat with research papers, alongside a comprehensive benchmarking suite (`benchmark.py`) comparing semantic chunking and cross-encoder reranking strategies.
+RAG Chatbot is an end-to-end research assistant powered by FastAPI, LangChain, Groq, and ChromaDB. It parses complex academic PDFs, extracts structured sections, generates summaries, and enables grounded conversational Q&A. It includes a benchmark suite evaluating semantic chunking and cross-encoder reranking across Hit Rate@3, MRR, and accuracy.
 
 ---
 
@@ -58,11 +54,17 @@ RAG-Chatbot/
     ├── get_summary.py                # LLM-based section summarization logic
     ├── create_vector_db.py           # Document chunking and Chroma vector indexing
     └── RAG_retrival_chain.py         # QA and Conversational Retrieval chains
+```
+
 ---
+
 ## Local Setup & Execution Guide
+
 ### Steps
+
+```bash
 # 1. Clone the repository and enter the directory
-git clone https://github.com/<JagadeeshKandula135>/RAG-Chatbot.git
+git clone [https://github.com/JagadeeshKandula135/RAG-Chatbot.git](https://github.com/JagadeeshKandula135/RAG-Chatbot.git)
 cd RAG-Chatbot
 
 # 2. Create and activate a virtual environment
@@ -83,6 +85,15 @@ echo "EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2" >> .env
 # 5. Start the web application
 uvicorn app:app --reload --port 8000
 
-# 6. Run the benchmark evaluation suite
+# 6. Run the benchmark evaluation suite (optional)
 python benchmark.py
+```
 
+---
+
+## Benchmark Results & Visuals
+
+![Normal vs. Semantic Benchmark](normal_vs_semantic_benchmark.png)
+
+* **Retrieval Quality (Panel 1)**: Compares Hit Rate@3 and Mean Reciprocal Rank (MRR) across character vs. semantic chunking and reranking.
+* **Accuracy Gain (Panel 2)**: Visualizes the percentage improvement in answer factual accuracy relative to the fixed-size baseline.
