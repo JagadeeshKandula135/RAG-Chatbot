@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Paper Analyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        /* NAVBAR */
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 50px;
+            background: linear-gradient(90deg, #1a237e, #283593);
+            color: #fff;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        nav .logo {
+            font-size: 1.8em;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        nav ul {
+            display: flex;
+            gap: 25px;
+            list-style: none;
+        }
+
+        nav ul li {
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        nav ul li:hover {
+            color: #00bcd4;
+        }
+
+        nav button {
+            padding: 8px 18px;
+            border: none;
+            background: #ff6f61;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        nav button:hover {
+            background: #ff8c70;
+        }
+
+        /* HERO */
+        .hero {
+            position: relative;
+            height: 90vh;
+            background: url('/static/hero3.jpg') center/cover no-repeat;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(18, 25, 102, 0.7);
+            opacity: 0.5;
+        }
+
+        .hero-content {
+            position: relative;
+            max-width: 900px;
+            animation: fadeInUp 1.2s ease;
+        }
+
+        .hero h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .hero p {
+            font-size: 1.3em;
+            margin-bottom: 30px;
+        }
+
+        .hero button {
+            padding: 15px 35px;
+            font-size: 1.1em;
+            border-radius: 10px;
+            background: #00bcd4;
+            color: #fff;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .hero button:hover {
+            background: #0097a7;
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        @keyframes fadeInUp {
+            0% {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* SECTIONS */
+        section {
+            padding: 80px 50px;
+            position: relative;
+        }
+
+        section h2 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 50px;
+            color: #1a237e;
+        }
+
+        /* FEATURES */
+        .features-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 40px;
+        }
+
+        .feature-card {
+            background: #fff;
+            padding: 35px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            transition: 0.5s;
+            transform-style: preserve-3d;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px) rotateY(10deg);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+        }
+
+        .feature-card i {
+            font-size: 3.2em;
+            color: #00bcd4;
+            margin-bottom: 20px;
+            transition: 0.3s;
+        }
+
+        .feature-card:hover i {
+            color: #ff6f61;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+
+        .feature-card p {
+            color: #555;
+        }
+
+        /* UPLOAD */
+        .upload-section {
+            background: linear-gradient(135deg, #0a198a, #0a1168);
+            color: #ffffff;
+            padding: 60px;
+            background: url('/static/hero2.jpg');
+            text-align: center;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .upload-section h2 {
+            color: #ffffff;
+            margin-bottom: 40px;
+            font-size: 2.2em;
+        }
+
+        .upload-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px dashed rgba(255, 255, 255, 0.4);
+            border-radius: 20px;
+            padding: 50px;
+            cursor: pointer;
+            transition: 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .upload-card input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-icon i {
+            font-size: 3.5em;
+            color: #00bcd4;
+            margin-bottom: 20px;
+            transition: 0.3s;
+        }
+
+        .upload-card:hover .upload-icon i {
+            color: #ff6f61;
+        }
+
+        .upload-card p {
+            font-size: 1.2em;
+            line-height: 1.5;
+        }
+
+        .progress-container {
+            width: 80%;
+            margin: 30px auto 0 auto;
+            height: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            width: 0;
+            height: 100%;
+            background: #00bcd4;
+            border-radius: 15px;
+            transition: width 0.5s;
+        }
+
+        .summary {
+            text-align: left;
+            margin-top: 30px;
+            background: #fff;
+            color: #333;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .summary h3 {
+            margin-bottom: 15px;
+            color: #1a237e;
+        }
+
+        #topicSection {
+            margin-top: 30px;
+        }
+
+        #topicSection select,
+        #topicSection button {
+            font-size: 1em;
+            padding: 10px;
+            border-radius: 10px;
+            border: none;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+
+        /* CHAT */
+        #chatSection {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        #chatSection h3 {
+            color: #fff;
+            margin-bottom: 15px;
+        }
+
+        #chatBox {
+            background: #fff;
+            color: #333;
+            padding: 20px;
+            height: 380px;
+            border-radius: 15px;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chat-message {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            font-size: 0.95em;
+            line-height: 1.4;
+            display: inline-block;
+            word-wrap: break-word;
+        }
+
+        .chat-user {
+            align-self: flex-end;
+            background: #00bcd4;
+            color: #fff;
+            border-bottom-right-radius: 5px;
+        }
+
+        .chat-ai {
+            align-self: flex-start;
+            background: #f1f1f1;
+            color: #333;
+            border-bottom-left-radius: 5px;
+        }
+
+        #chatInput {
+            width: 70%;
+            padding: 10px 15px;
+            border-radius: 10px;
+            border: none;
+            margin-right: 10px;
+        }
+
+        #chatSection button {
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            background: #00bcd4;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        /* VISUALIZATION */
+        #charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .chart-card {
+            background: #fff;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+            transition: 0.3s;
+            text-align: left;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+        }
+
+        /* ABOUT */
+        #about p {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+            line-height: 1.8;
+        }
+
+        /* FOOTER */
+        footer {
+            background: linear-gradient(90deg, #1a237e, #283593);
+            color: #fff;
+            text-align: center;
+            padding: 35px;
+        }
+
+        footer a {
+            color: #ff6f61;
+            margin: 0 10px;
+            text-decoration: none;
+            font-size: 1.2em;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* RESPONSIVE */
+        @media(max-width:768px) {
+            nav {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .hero h1 {
+                font-size: 2.2em;
+            }
+
+            .hero p {
+                font-size: 1.1em;
+            }
+
+            section {
+                padding: 60px 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <nav>
+        <div class="logo">ResearchPortal</div>
+        <ul>
+            <li>Home</li>
+            <li>Features</li>
+            <li>Upload</li>
+            <li>Visualizations</li>
+            <li>About</li>
+            <li>Contact</li>
+        </ul>
+        <button>Login</button>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Effortless Research Paper Analysis</h1>
+            <p>Upload, summarize, and explore insights from academic papers using AI-powered tools.</p>
+            <button onclick="document.getElementById('uploadSection').scrollIntoView({behavior:'smooth'})">Upload
+                Paper</button>
+        </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section id="about">
+        <h2>About The Project</h2>
+        <p>This project leverages AI and NLP to analyze research papers, generate summaries, extract keywords, and
+            visualize trends.</p>
+        <p><strong>Tech Stack:</strong> Python, AI/ML, NLP, PDF Parsing, Chart.js, Modern Web Front-end (HTML/CSS/JS or
+            React)</p>
+    </section>
+
+    <!-- UPLOAD -->
+    <section id="uploadSection" class="upload-section">
+        <h2>Upload Your Research Paper</h2>
+        <div class="upload-card" id="uploadCard">
+            <div class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+            <p>Drag & Drop your PDF here<br>or click to browse</p>
+        </div>
+        <input type="file" id="pdfFile" accept=".pdf" style="display:none;">
+
+        <div class="progress-container" id="progressContainer" style="display:none;">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <!-- Topics Dropdown -->
+        <div id="topicSection" style="display:none;">
+            <label for="topicSelect" style="color:#fff;font-size:1.2em;">Select Topic:</label>
+            <select id="topicSelect"></select>
+            <button onclick="showTopicSummary()">Show Summary</button>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary" id="summarySection" style="display:none;">
+            <h3>Summary</h3>
+            <p id="summaryContent"></p>
+        </div>
+
+        <!-- Chat -->
+        <div id="chatSection" style="display:none;">
+            <h3>Ask Questions About This Research Paper</h3>
+            <div id="chatBox" style="height: 500px;"></div>
+            <div style="margin-top:10px;">
+                <input type="text" id="chatInput" placeholder="Type your question...">
+                <button onclick="sendChat()">Send</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section id="features">
+        <h2>Key Features</h2>
+        <div class="features-container">
+            <div class="feature-card"><i class="fa-solid fa-file-pdf"></i>
+                <h3>PDF Analysis</h3>
+                <p>Analyze PDFs instantly with AI tools.</p>
+            </div>
+            <div class="feature-card"><i class="fa-solid fa-file-lines"></i>
+                <h3>Summary Generation</h3>
+                <p>Generate detailed summaries for each topic.</p>
+            </div>
+            <div class="feature-card"><i class="fa-solid fa-chart-simple"></i>
+                <h3>Topic Modeling</h3>
+                <p>Discover key topics and trends from papers.</p>
+            </div>
+            <div class="feature-card"><i class="fa-solid fa-key"></i>
+                <h3>Citation Extraction</h3>
+                <p>Organize references and citations quickly.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- VISUALIZATIONS -->
+    <section id="visualizations">
+        <h2>Analysis Visualizations</h2>
+        <div id="charts-container">
+            <div class="chart-card">Keyword Frequency Chart</div>
+            <div class="chart-card">Topic Trend Chart</div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        &copy; 2025 ResearchPortal |
+        <a href="#">GitHub</a> |
+        <a href="#">LinkedIn</a> |
+        <a href="#">Twitter</a>
+    </footer>
+
+    <script>
+    const uploadCard = document.getElementById('uploadCard');
+    const fileInput = document.getElementById('pdfFile');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const topicSection = document.getElementById('topicSection');
+    const topicSelect = document.getElementById('topicSelect');
+    const summarySection = document.getElementById('summarySection');
+    const summaryContent = document.getElementById('summaryContent');
+    const chatSection = document.getElementById('chatSection');
+    const chatBox = document.getElementById('chatBox');
+    const chatInput = document.getElementById('chatInput');
+
+    uploadCard.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleFile);
+
+    uploadCard.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadCard.style.background = 'rgba(255,255,255,0.15)';
+    });
+
+    uploadCard.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        uploadCard.style.background = 'rgba(255,255,255,0.05)';
+    });
+
+    uploadCard.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadCard.style.background = 'rgba(255,255,255,0.05)';
+        fileInput.files = e.dataTransfer.files;
+        handleFile();
+    });
+
+    // Allow Enter key to trigger sendChat
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendChat();
+    });
+
+    function handleFile() {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0%';
+        topicSection.style.display = 'none';
+        summarySection.style.display = 'none';
+        chatSection.style.display = 'none';
+
+        let width = 0;
+        const interval = setInterval(() => {
+            if (width >= 90) {
+                clearInterval(interval);
+            } else {
+                width += 15;
+                progressBar.style.width = width + '%';
+            }
+        }, 150);
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        fetch('/upload', { method: 'POST', body: formData })
+            .then(res => {
+                if (!res.ok) throw new Error("Upload failed");
+                return res.json();
+            })
+            .then(data => {
+                progressBar.style.width = '100%';
+                setTimeout(() => { progressContainer.style.display = 'none'; }, 400);
+
+                topicSelect.innerHTML = '';
+                if (data.topics && data.topics.length > 0) {
+                    data.topics.forEach(t => {
+                        let opt = document.createElement('option');
+                        opt.value = t;
+                        opt.innerText = t;
+                        topicSelect.appendChild(opt);
+                    });
+                    topicSection.style.display = 'block';
+                }
+            })
+            .catch(err => {
+                alert("Error processing document: " + err.message);
+                progressContainer.style.display = 'none';
+            });
+    }
+
+    function formatSummary(text) {
+        return text
+            .replace(/^### (.*$)/gim, '<h4>$1</h4>')
+            .replace(/^## (.*$)/gim, '<h3>$1</h3>')
+            .replace(/^# (.*$)/gim, '<h2>$1</h2>')
+            .replace(/^- (.*$)/gim, '<li>$1</li>')
+            .replace(/\n\n/g, '<br><br>');
+    }
+
+    function showTopicSummary() {
+        const topic = topicSelect.value;
+        if (!topic) return;
+
+        summaryContent.innerHTML = '<em>Generating summary with AI...</em>';
+        summarySection.style.display = 'block';
+        chatSection.style.display = 'block';
+
+        fetch('/summary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic: topic })
+        })
+        .then(res => res.json())
+        .then(data => {
+            const raw = data.summary || "No summary available.";
+            summaryContent.innerHTML = formatSummary(raw);
+        })
+        .catch(err => {
+            summaryContent.innerHTML = '<span style="color:red;">Failed to load summary.</span>';
+        });
+    }
+
+    function sendChat() {
+        const msg = chatInput.value.trim();
+        if (!msg) return;
+
+        // User message
+        const userMsg = document.createElement('div');
+        userMsg.className = 'chat-message chat-user';
+        userMsg.innerHTML = `<i class="fa-solid fa-user"></i> ${msg}`;
+        chatBox.appendChild(userMsg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        chatInput.value = '';
+
+        // AI Typing placeholder
+        const aiMsg = document.createElement('div');
+        aiMsg.className = 'chat-message chat-ai';
+        aiMsg.innerHTML = `<i class="fa-solid fa-robot"></i> <em>Thinking...</em>`;
+        chatBox.appendChild(aiMsg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg })
+        })
+        .then(res => res.json())
+        .then(data => {
+            aiMsg.innerHTML = `<i class="fa-solid fa-robot"></i> ${data.response || "No response received."}`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+        })
+        .catch(() => {
+            aiMsg.innerHTML = `<i class="fa-solid fa-robot"></i> <span style="color:red;">Error fetching answer.</span>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+    }
+</script>
+
+</body>
+
+</html>
