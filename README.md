@@ -58,9 +58,11 @@ RAG-Chatbot/
     ├── get_summary.py                # LLM-based section summarization logic
     ├── create_vector_db.py           # Document chunking and Chroma vector indexing
     └── RAG_retrival_chain.py         # QA and Conversational Retrieval chains
+
+## Local Setup & Execution Guide
 ### Steps
 # 1. Clone the repository and enter the directory
-git clone https://github.com/<your-username>/RAG-Chatbot.git
+git clone https://github.com/<JagadeeshKandula135>/RAG-Chatbot.git
 cd RAG-Chatbot
 
 # 2. Create and activate a virtual environment
