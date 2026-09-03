@@ -1,2 +1,61 @@
 # RAG-Chatbot
 RAG Chatbot is an end-to-end research assistant powered by FastAPI, LangChain, Groq, and ChromaDB. It parses complex academic PDFs, extracts structured sections, generates summaries, and enables grounded conversational Q&amp;A. It includes a benchmark suite evaluating semantic chunking and cross-encoder reranking across Hit Rate@3, MRR, and accuracy.
+
+
+# Research Paper RAG Chatbot & Retrieval Benchmarking Suite
+
+A production-ready Retrieval-Augmented Generation (RAG) system built with **FastAPI**, **LangChain**, **Groq**, and **ChromaDB**. The project features an interactive web interface to parse, segment, summarize, and chat with research papers, alongside a comprehensive benchmarking suite (`benchmark.py`) comparing semantic chunking and cross-encoder reranking strategies.
+
+---
+
+## Key Features
+
+* **Interactive Web Application (`app.py`)**:
+  * **Automated Section Segmentation**: Extracts raw text from uploaded PDFs, isolates sections, and refines section names using an LLM.
+  * **On-Demand Summarization**: Generates granular, focused summaries for specific detected sections.
+  * **Conversational Multi-Turn QA**: Context-grounded Q&A against the indexed document using memory and vector similarity search.
+* **Retrieval & Accuracy Benchmarking (`benchmark.py`)**:
+  * Evaluates 4 retrieval pipelines:
+    1. **Fixed-Size (Character) Chunking (Baseline)**
+    2. **Semantic Chunking** (`SemanticChunker` with distance percentile thresholds)
+    3. **Character Chunking + Cross-Encoder Reranker** (`ms-marco-MiniLM-L-6-v2`)
+    4. **Semantic Chunking + Cross-Encoder Reranker**
+  * Computes **Hit Rate@3**, **Mean Reciprocal Rank (MRR)**, **LLM-Judged Factual Accuracy**, and **Query Latency**.
+  * Automatically plots and saves evaluation bar charts (`normal_vs_semantic_benchmark.png`).
+
+---
+
+## Tech Stack
+
+* **Backend & Web Framework**: FastAPI, Uvicorn, Jinja2, Pydantic
+* **LLM Engine**: Groq Cloud API (`llama-3.1-8b-instant`)
+* **Embedding Model**: `sentence-transformers/all-MiniLM-L6-v2` via `langchain-huggingface`
+* **Reranker Model**: `cross-encoder/ms-marco-MiniLM-L-6-v2` via `sentence-transformers`
+* **Vector Store**: ChromaDB (`langchain-chroma`)
+* **Framework Orchestration**: LangChain, `langchain-experimental`, `langchain-text-splitters`
+* **PDF Processing**: PyPDF2
+* **Analytics & Visualization**: pandas, numpy, matplotlib
+
+---
+
+## Project Structure
+
+```text
+RAG-Chatbot/
+│
+├── app.py                            # FastAPI application server and routes
+├── benchmark.py                      # RAG retrieval evaluation & benchmarking script
+├── requirements.txt                  # Python dependencies
+├── .env                              # Environment variables (API keys & models)
+├── normal_vs_semantic_benchmark.png  # Generated benchmark visualization chart
+├── templates/
+│   └── index.html                    # Frontend user interface
+├── static/                           # Static assets (CSS, JS, images)
+├── uploads/                          # Stored PDF uploads
+└── src/
+    ├── load_and_extract_text.py      # PDF parsing and raw text extraction
+    ├── detect_and_split_sections.py  # Section boundary detection and splitting
+    ├── get_summary.py                # LLM-based section summarization logic
+    ├── create_vector_db.py           # Document chunking and Chroma vector indexing
+    └── RAG_retrival_chain.py         # QA and Conversational Retrieval chains
+
