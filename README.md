@@ -59,3 +59,28 @@ RAG-Chatbot/
     ├── create_vector_db.py           # Document chunking and Chroma vector indexing
     └── RAG_retrival_chain.py         # QA and Conversational Retrieval chains
 
+# 1. Clone the repository and enter the directory
+git clone https://github.com/<your-username>/RAG-Chatbot.git
+cd RAG-Chatbot
+
+# 2. Create and activate a virtual environment
+python -m venv researchenv
+# On Windows (PowerShell):
+.\researchenv\Scripts\Activate.ps1
+# On macOS/Linux:
+# source researchenv/bin/activate
+
+# 3. Install project dependencies
+pip install -r requirements.txt
+
+# 4. Create .env file with your API key and model configurations
+echo "GROQ_API_KEY=your_actual_groq_api_key" > .env
+echo "LLM_MODEL=llama-3.1-8b-instant" >> .env
+echo "EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2" >> .env
+
+# 5. Start the web application
+uvicorn app:app --reload --port 8000
+
+# 6. Run the benchmark evaluation suite
+python benchmark.py
+
