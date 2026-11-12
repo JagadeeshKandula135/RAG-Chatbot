@@ -1,54 +1,56 @@
 import json
 import os
-import shutil
-from typing import Dict, List, Optional
-from dotenv import load_dotenv
+import re
+import time
+import uuid
+from typing import Optional
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from langchain_groq import ChatGroq
-from langchain_huggingface import HuggingFaceEmbeddings
-from src.create_vector_db import create_vector_db
-from src.detect_and_split_sections import (
-    refine_sections,
-    split_sections_with_content,
+from src.config import (
+    MAX_UPLOAD_MB,
+    SESSION_TTL_SECONDS,
+    UPLOAD_FOLDER,
+    get_embedder,
+    get_llm,
 )
+from src.create_vector_db import create_vector_db
+from src.detect_and_split_sections import refine_sections, split_sections_with_content
 from src.get_summary import generate_detailed_summary
 from src.load_and_extract_text import extract_pdf_sections, extract_text_from_pdf
-from src.RAG_retrival_chain import get_qa_chain, get_conversational_chain
+from src.RAG_retrival_chain import get_conversational_chain
+from src.session_store import Session, SessionStore
 
-
-load_dotenv()
-
-UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.1-8b-instant")
-EMBEDDING_MODEL = os.getenv(
-    "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
+# Shared, stateless model clients (safe to reuse across sessions).
+llm = get_llm()
+embedder = get_embedder()
+
+# All per-user state lives in the session store, not in module globals.
+sessions = SessionStore(ttl_seconds=SESSION_TTL_SECONDS)
+
+app = FastAPI(title="Research Paper Analyzer", version="2.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Process-Time-Ms"],
 )
 
-# Initialize Models
-llm = ChatGroq(groq_api_key=GROQ_API_KEY, model_name=LLM_MODEL)
-embedder = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 
-# Session state
-full_text = ""
-Research_paper_topics: Dict[str, str] = {}
-vector_db = None
-
-# Initialize FastAPI & Jinja2 Templates
-app = FastAPI(title="Research Paper Analyzer")
-
-# Create static dir if not existing so StaticFiles mount doesn't crash
-os.makedirs("static", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+@app.middleware("http")
+async def add_process_time(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    response.headers["X-Process-Time-Ms"] = f"{(time.perf_counter() - start) * 1000:.0f}"
+    return response
 
 
 class SummaryRequest(BaseModel):
@@ -59,115 +61,142 @@ class ChatRequest(BaseModel):
     message: str
 
 
+def require_session(session_id: Optional[str]) -> Session:
+    s = sessions.get(session_id)
+    if not s:
+        raise HTTPException(
+            status_code=401, detail="Unknown or expired session. Please upload a PDF."
+        )
+    return s
 
-@app.get("/", response_class=HTMLResponse)
-async def serve_index(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html")
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
 
 
-@app.post("/upload")
+@app.post("/api/upload")
 async def upload_pdf(file: UploadFile = File(...)):
-    """Handles PDF file upload, text extraction, and section detection."""
-    global full_text, Research_paper_topics, vector_db
+    """Extract text + sections and index the paper in a new isolated session."""
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(
-            status_code=400, detail="Only PDF files are supported."
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"File exceeds {MAX_UPLOAD_MB} MB.")
+
+    session = sessions.create()
+    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(file.filename))
+    file_path = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4().hex[:8]}_{safe_name}")
+    with open(file_path, "wb") as f:
+        f.write(data)
+
+    def process():
+        text = extract_text_from_pdf(file_path)
+        sections = extract_pdf_sections(full_text=text)
+        refined = refine_sections(json.dumps(sections), llm=llm)
+        topics = split_sections_with_content(text, refined)
+        # Index at upload time so the first chat question is fast.
+        db = create_vector_db(
+            text=text,
+            embedder=embedder,
+            session_id=session.id,
+            sections=topics,
+            source=safe_name,
         )
-
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        return text, topics, db
 
     try:
-        extracted_text = extract_text_from_pdf(file_path)
-        full_text = extracted_text
-        vector_db = None  # Reset index for fresh PDF
+        text, topics, db = await run_in_threadpool(process)
+    except Exception as e:
+        sessions.delete(session.id)
+        raise HTTPException(status_code=500, detail=f"Failed to process PDF: {e}")
+    finally:
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
 
-        extracted_sections = extract_pdf_sections(full_text=extracted_text)
-        refined_sections = refine_sections(
-            json.dumps(extracted_sections), llm=llm
-        )
-        section_with_content = split_sections_with_content(
-            extracted_text, refined_sections
-        )
+    session.full_text, session.topics, session.vector_db = text, topics, db
+    session.filename = safe_name
+    session.chain = get_conversational_chain(vectordb=db, llm=llm)
 
-        Research_paper_topics = section_with_content
+    return {
+        "session_id": session.id,
+        "message": "File processed successfully",
+        "topics": list(topics.keys()),
+    }
 
-        return {
-            "message": "File processed successfully",
-            "topics": list(Research_paper_topics.keys()),
+
+@app.post("/api/summary")
+async def get_summary(
+    payload: SummaryRequest, x_session_id: Optional[str] = Header(None)
+):
+    session = require_session(x_session_id)
+    content = session.topics.get(payload.topic)
+    if not content:
+        raise HTTPException(status_code=404, detail=f"Topic '{payload.topic}' not found.")
+    try:
+        summary = await run_in_threadpool(generate_detailed_summary, content, llm)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate summary: {e}")
+    return {"topic": payload.topic, "summary": summary}
+
+
+@app.post("/api/chat")
+async def chat(payload: ChatRequest, x_session_id: Optional[str] = Header(None)):
+    """Multi-turn conversational RAG against this session's indexed paper."""
+    session = require_session(x_session_id)
+    if not session.chain:
+        raise HTTPException(status_code=400, detail="Document is not indexed yet.")
+
+    def run():
+        # Memory is per-session and mutable: serialize turns within a session
+        # while different sessions run fully in parallel.
+        with session.lock:
+            t0 = time.perf_counter()
+            result = session.chain.invoke({"question": payload.message})
+            return result, (time.perf_counter() - t0) * 1000
+
+    try:
+        result, ms = await run_in_threadpool(run)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve answer: {e}")
+
+    sources = [
+        {
+            "section": d.metadata.get("section"),
+            "chunk_index": d.metadata.get("chunk_index"),
+            "snippet": d.page_content[:200],
         }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to process PDF: {str(e)}"
-        )
-
-
-@app.post("/summary")
-async def get_summary(payload: SummaryRequest):
-    """Generates detailed summary for selected section."""
-    global Research_paper_topics
-
-    if not Research_paper_topics:
-        raise HTTPException(
-            status_code=400, detail="No paper has been uploaded yet."
-        )
-
-    topic_content = Research_paper_topics.get(payload.topic)
-    if not topic_content:
-        raise HTTPException(
-            status_code=404, detail=f"Topic '{payload.topic}' not found."
-        )
-
-    try:
-        summary = generate_detailed_summary(topic_content, llm)
-        return {"topic": payload.topic, "summary": summary}
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to generate summary: {str(e)}"
-        )
+        for d in result.get("source_documents", [])
+    ]
+    return {
+        "response": result.get("answer", "I don't know."),
+        "sources": sources,
+        "latency_ms": round(ms),
+    }
 
 
-conversational_chain = None
+@app.delete("/api/session")
+def end_session(x_session_id: Optional[str] = Header(None)):
+    return {"deleted": sessions.delete(x_session_id or "")}
 
 
-@app.post("/chat")
-async def chat(payload: ChatRequest):
-    """Multi-turn conversational RAG query against the uploaded paper."""
-    global full_text, vector_db, conversational_chain
+# Serve the built React app (run `npm run build` in frontend/).
+DIST = os.path.join("frontend", "dist")
+if os.path.isdir(DIST):
+    app.mount("/assets", StaticFiles(directory=os.path.join(DIST, "assets")), name="assets")
 
-    if not full_text:
-        raise HTTPException(
-            status_code=400, detail="Please upload a PDF document first."
-        )
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa(full_path: str):
+        candidate = os.path.join(DIST, full_path)
+        if full_path and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(os.path.join(DIST, "index.html"))
 
-    try:
-        
-        if not vector_db:
-            vector_db = create_vector_db(text=full_text, embedder=embedder)
-
-        
-        if not conversational_chain:
-            conversational_chain = get_conversational_chain(
-                vectordb=vector_db, llm=llm
-            )
-
-        
-        result = conversational_chain.invoke({"question": payload.message})
-
-        ai_response = result.get("answer", "I don't know.")
-        return {"response": ai_response}
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve answer: {str(e)}"
-        )
-
-
-import uvicorn
 
 if __name__ == "__main__":
+    import uvicorn
+
     uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)

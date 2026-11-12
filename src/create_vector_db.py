@@ -1,41 +1,106 @@
-import os
-import shutil
+"""Vector DB schema + embedding pipeline on ChromaDB.
+
+Schema (one Chroma collection per session, cosine HNSW index):
+    document : chunk text
+    embedding: OpenAI embedding vector
+    metadata : session_id, source, section, chunk_index, start_index, n_chars
+"""
+import re
+from typing import Dict, Optional
+
+import chromadb
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-CHROMA_PERSIST_DIR = "chroma_db_store"
+from src.config import CHROMA_PERSIST_DIR
+
+CHUNK_SIZE = 800
+CHUNK_OVERLAP = 120
+
+# HNSW parameters tuned for small/medium per-document collections.
+COLLECTION_METADATA = {
+    "hnsw:space": "cosine",
+    "hnsw:construction_ef": 128,
+    "hnsw:search_ef": 64,
+    "hnsw:M": 16,
+}
+
+_client = None
 
 
-def create_vector_db(text: str, embedder: Embeddings) -> Chroma:
-    """Splits input text into chunks, generates vector embeddings,
+def _get_client():
+    global _client
+    if _client is None:
+        _client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
+    return _client
 
-    and stores them in a persistent Chroma vector database.
-    """
-    # Optional: Clear previous document collection if storing single session
-    if os.path.exists(CHROMA_PERSIST_DIR):
-        shutil.rmtree(CHROMA_PERSIST_DIR)
 
-    # 1. Wrap raw text in Document object
-    doc = Document(page_content=text)
+def collection_name(session_id: str) -> str:
+    safe = re.sub(r"[^a-zA-Z0-9_-]", "", session_id)[:48]
+    return f"paper_{safe}"
 
-    # 2. Split document into chunks
+
+def build_documents(
+    text: str,
+    sections: Optional[Dict[str, str]] = None,
+    source: str = "document",
+    session_id: str = "",
+) -> list:
+    """Section-aware chunking: each chunk carries its section as metadata."""
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=100,
-        separators=["\n\n", "\n", ".", " "],
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+        separators=["\n\n", "\n", ". ", " "],
+        add_start_index=True,
     )
-    docs = splitter.split_documents([doc])
-    print(f"Created {len(docs)} document chunks.")
+    units = sections if sections else {"Full_Paper": text}
+    docs, idx = [], 0
+    for section, content in units.items():
+        for d in splitter.split_documents([Document(page_content=content)]):
+            d.metadata = {
+                "session_id": session_id,
+                "source": source,
+                "section": section,
+                "chunk_index": idx,
+                "start_index": d.metadata.get("start_index", 0),
+                "n_chars": len(d.page_content),
+            }
+            docs.append(d)
+            idx += 1
+    return docs
 
-    # 3. Create & persist Chroma vector database
-    vectordb = Chroma.from_documents(
-        documents=docs,
-        embedding=embedder,
-        collection_name="research_paper_collection",
-        persist_directory=CHROMA_PERSIST_DIR,
+
+def create_vector_db(
+    text: str,
+    embedder: Embeddings,
+    session_id: str = "default",
+    sections: Optional[Dict[str, str]] = None,
+    source: str = "document",
+) -> Chroma:
+    """Chunk -> embed (batched) -> store in this session's Chroma collection."""
+    client = _get_client()
+    name = collection_name(session_id)
+    try:  # fresh index for a freshly uploaded paper
+        client.delete_collection(name)
+    except Exception:
+        pass
+
+    docs = build_documents(text, sections, source, session_id)
+    vectordb = Chroma(
+        client=client,
+        collection_name=name,
+        embedding_function=embedder,
+        collection_metadata=COLLECTION_METADATA,
     )
-    print(f"Chroma DB saved to '{CHROMA_PERSIST_DIR}'.")
-
+    ids = [f"{name}-{d.metadata['chunk_index']}" for d in docs]
+    vectordb.add_documents(docs, ids=ids)
     return vectordb
+
+
+def delete_vector_db(session_id: str) -> None:
+    try:
+        _get_client().delete_collection(collection_name(session_id))
+    except Exception:
+        pass

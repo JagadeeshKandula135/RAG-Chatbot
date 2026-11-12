@@ -1,0 +1,8 @@
+.env
+.embedding_cache/
+chroma_db_*/
+node_modules/
+frontend/dist/
+__pycache__/
+*.pyc
+researchenv/

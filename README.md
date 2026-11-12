@@ -1,99 +1,64 @@
 # RAG Chatbot
 
-RAG Chatbot is an end-to-end research assistant powered by FastAPI, LangChain, Groq, and ChromaDB. It parses complex academic PDFs, extracts structured sections, generates summaries, and enables grounded conversational Q&A. It includes a benchmark suite evaluating semantic chunking and cross-encoder reranking across Hit Rate@3, MRR, and accuracy.
+Full-stack Retrieval-Augmented Generation (RAG) chatbot for research papers, built with **React**, **FastAPI**, **LangChain**, **ChromaDB** and the **OpenAI API**. Upload a PDF, get section summaries, and hold context-aware multi-turn conversations grounded in the document.
 
----
+## Architecture
 
-## Key Features
-
-* **Interactive Web Application (`app.py`)**:
-  * **Automated Section Segmentation**: Extracts raw text from uploaded PDFs, isolates sections, and refines section names using an LLM.
-  * **On-Demand Summarization**: Generates granular, focused summaries for specific detected sections.
-  * **Conversational Multi-Turn QA**: Context-grounded Q&A against the indexed document using memory and vector similarity search.
-* **Retrieval & Accuracy Benchmarking (`benchmark.py`)**:
-  * Evaluates 4 retrieval pipelines:
-    1. **Fixed-Size (Character) Chunking (Baseline)**
-    2. **Semantic Chunking** (`SemanticChunker` with distance percentile thresholds)
-    3. **Character Chunking + Cross-Encoder Reranker** (`ms-marco-MiniLM-L-6-v2`)
-    4. **Semantic Chunking + Cross-Encoder Reranker**
-  * Computes **Hit Rate@3**, **Mean Reciprocal Rank (MRR)**, **LLM-Judged Factual Accuracy**, and **Query Latency**.
-  * Automatically plots and saves evaluation bar charts (`normal_vs_semantic_benchmark.png`).
-
----
-
-## Tech Stack
-
-* **Backend & Web Framework**: FastAPI, Uvicorn, Jinja2, Pydantic
-* **LLM Engine**: Groq Cloud API (`llama-3.1-8b-instant`)
-* **Embedding Model**: `sentence-transformers/all-MiniLM-L6-v2` via `langchain-huggingface`
-* **Reranker Model**: `cross-encoder/ms-marco-MiniLM-L-6-v2` via `sentence-transformers`
-* **Vector Store**: ChromaDB (`langchain-chroma`)
-* **Framework Orchestration**: LangChain, `langchain-experimental`, `langchain-text-splitters`
-* **PDF Processing**: PyPDF2
-* **Analytics & Visualization**: pandas, numpy, matplotlib
-
----
-
-## Project Structure
-
-```text
-RAG-Chatbot/
-│
-├── app.py                            # FastAPI application server and routes
-├── benchmark.py                      # RAG retrieval evaluation & benchmarking script
-├── requirements.txt                  # Python dependencies
-├── .env                              # Environment variables (API keys & models)
-├── normal_vs_semantic_benchmark.png  # Generated benchmark visualization chart
-├── templates/
-│   └── index.html                    # Frontend user interface
-├── static/                           # Static assets (CSS, JS, images)
-├── uploads/                          # Stored PDF uploads
-└── src/
-    ├── load_and_extract_text.py      # PDF parsing and raw text extraction
-    ├── detect_and_split_sections.py  # Section boundary detection and splitting
-    ├── get_summary.py                # LLM-based section summarization logic
-    ├── create_vector_db.py           # Document chunking and Chroma vector indexing
-    └── RAG_retrival_chain.py         # QA and Conversational Retrieval chains
+```
+React (Vite)  ──REST/JSON──▶  FastAPI  ──▶  LangChain ConversationalRetrievalChain
+ X-Session-ID header            │                 │                 │
+                                │          OpenAI chat model   MMR retriever
+                         SessionStore                              │
+                      (per-user state, TTL)            ChromaDB (cosine HNSW,
+                                                      one collection per session)
+                                                                   ▲
+                                         OpenAI embeddings (batched + disk-cached)
 ```
 
----
+* **Scalable REST design**: no global state. Each upload creates a session (`X-Session-ID`) holding its own text, sections, Chroma collection and conversation memory. Sessions expire after a TTL and their collections are deleted. Blocking LLM/embedding work runs in a threadpool, so sessions are served concurrently; turns within one session are serialized.
+* **Vector DB schema** (`src/create_vector_db.py`): one collection per session using a cosine HNSW index (tuned `M`, `construction_ef`, `search_ef`). Each chunk stores `session_id`, `source`, `section`, `chunk_index`, `start_index`, `n_chars` as metadata. Chunking is section-aware.
+* **Embedding pipeline**: `RecursiveCharacterTextSplitter` (800/120) → OpenAI `text-embedding-3-small`, batched, behind a `CacheBackedEmbeddings` disk cache (documents and queries).
+* **Retrieval / multi-turn context**: MMR search (fetch 20 by similarity, return 4 diverse), a question-condensing prompt to resolve follow-ups, and windowed conversation memory per session.
+* **Latency & optimization**: indexing happens at upload so the first question is fast; embedding cache; per-request `latency_ms` and an `X-Process-Time-Ms` header; `benchmark.py` measures chunking/reranking strategies on Hit Rate@3, MRR, accuracy and latency.
 
-## Local Setup & Execution Guide
+## API
 
-### Steps
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/upload` | Upload PDF → returns `session_id` and detected sections |
+| POST | `/api/summary` | Summarize a section (`X-Session-ID`) |
+| POST | `/api/chat` | Multi-turn RAG answer + sources + latency |
+| DELETE | `/api/session` | End the session and drop its vectors |
+| GET | `/api/health` | Health check |
+
+## Setup
 
 ```bash
-# 1. Clone the repository and enter the directory
-git clone [https://github.com/JagadeeshKandula135/RAG-Chatbot.git](https://github.com/JagadeeshKandula135/RAG-Chatbot.git)
-cd RAG-Chatbot
+pip install -r requirement.txt
+cp .env.example .env        # set OPENAI_API_KEY
 
-# 2. Create and activate a virtual environment
-python -m venv researchenv
-# On Windows (PowerShell):
-.\researchenv\Scripts\Activate.ps1
-# On macOS/Linux:
-# source researchenv/bin/activate
+# Frontend
+cd frontend && npm install && npm run build && cd ..
 
-# 3. Install project dependencies
-pip install -r requirements.txt
+# Run (serves the built React app and the API)
+python app.py               # http://127.0.0.1:8000
 
-# 4. Create .env file with your API key and model configurations
-echo "GROQ_API_KEY=your_actual_groq_api_key" > .env
-echo "LLM_MODEL=llama-3.1-8b-instant" >> .env
-echo "EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2" >> .env
-
-# 5. Start the web application
-uvicorn app:app --reload --port 8000
-
-# 6. Run the benchmark evaluation suite (optional)
-python benchmark.py
+# Frontend dev server with hot reload (API proxied to :8000)
+cd frontend && npm run dev  # http://localhost:5173
 ```
 
----
+Optional benchmark: `python benchmark.py`
 
-## Benchmark Results & Visuals
+## Project structure
 
-![Normal vs. Semantic Benchmark](normal_vs_semantic_benchmark.png)
-
-* **Retrieval Quality (Panel 1)**: Compares Hit Rate@3 and Mean Reciprocal Rank (MRR) across character vs. semantic chunking and reranking.
-* **Accuracy Gain (Panel 2)**: Visualizes the percentage improvement in answer factual accuracy relative to the fixed-size baseline.
+```text
+app.py                      FastAPI app, REST routes, session handling
+benchmark.py                Retrieval evaluation (chunking, reranking)
+frontend/                   React (Vite) UI
+src/config.py               Settings, OpenAI LLM + cached embeddings
+src/session_store.py        Per-session state with TTL eviction
+src/create_vector_db.py     Chunking, metadata schema, Chroma collections
+src/RAG_retrival_chain.py   MMR retriever, prompts, conversational chain
+src/get_summary.py          Section summarization
+src/detect_and_split_sections.py, src/load_and_extract_text.py   PDF parsing
+```
